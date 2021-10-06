@@ -30,8 +30,8 @@ type resolver struct{ *store }
 
 func (r *resolver) NewProcess() (*Process, error) { return r.store.NewProcess() }
 
-func (r *resolver) AllProcesses() []Process {
-	return nil
+func (r *resolver) AllProcesses() ([]Process, error) {
+	return r.store.Processes()
 }
 
 //go:embed schema.graphql
@@ -89,6 +89,19 @@ func (s *store) NewProcess() (*Process, error) {
 	}
 
 	return &process, nil
+}
+func (s *store) Processes() ([]Process, error) {
+	_, err := s.db.Query("SELECT id, status FROM processes")
+	if err != nil {
+		return nil, fmt.Errorf("failed to select from processes: %w", err)
+	}
+
+	var processes []Process
+//	if err := sqlscan.ScanAll(&processes, rows); err != nil {
+//		return nil, fmt.Errorf("failed to scan result set: %w", err)
+//	}
+
+	return processes, nil
 }
 
 type pid int
