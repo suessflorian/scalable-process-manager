@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/99designs/gqlgen/graphql/playground"
-	"github.com/gofrs/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	log "github.com/sirupsen/logrus"
@@ -19,12 +18,8 @@ import (
 
 type ProcessState string
 
-const PORT = 8080
-
 const (
-	RUNNING  ProcessState = "RUNNING"
-	FINISHED ProcessState = "FINISHED"
-	FAILED   ProcessState = "FAILED"
+	RUNNING ProcessState = "RUNNING"
 )
 
 type Process struct {
@@ -33,9 +28,7 @@ type Process struct {
 }
 type resolver struct{ *store }
 
-func (r *resolver) NewProcess() *Process {
-	return &Process{newPID(), RUNNING}
-}
+func (r *resolver) NewProcess() (*Process, error) { return r.store.NewProcess() }
 
 func (r *resolver) AllProcesses() []Process {
 	return nil
@@ -56,7 +49,7 @@ func main() {
 			graphql.UseFieldResolvers(),
 		)})
 
-	log.Info("server on localhost:8080")
+	log.Info("server on localhost:8080...")
 	if err := http.ListenAndServe(":8080", nil); err != http.ErrServerClosed {
 		log.WithError(err).Errorf("server closed due to unexpected error")
 	}
@@ -87,21 +80,28 @@ func mustNewStore() *store {
 }
 
 func (s *store) Close() error { return s.db.Close() }
-func (s *store) UpdateProcess(pid pid, status ProcessState) {
-	s.db.Exec("INSERT INTO processes(id, status) VALUES()")
+func (s *store) NewProcess() (*Process, error) {
+	row := s.db.QueryRow("INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
+
+	var process Process
+	if err := row.Scan(&process.Pid, &process.Status); err != nil {
+		return nil, fmt.Errorf("failed to insert into processes table: %w", err)
+	}
+
+	return &process, nil
 }
 
-type pid uuid.UUID
+type pid int
 
 func (p pid) MarshalJSON() ([]byte, error) {
-	return strconv.AppendQuote(nil, uuid.UUID(p).String()), nil
+	return strconv.AppendQuote(nil, fmt.Sprintf("%d", p)), nil
 }
 
 func (p *pid) UnmarshalGraphQL(input interface{}) error {
 	var err error
 	switch input := input.(type) {
 	case string:
-		uuid, err := uuid.FromString(input)
+		uuid, err := strconv.Atoi(input)
 		if err != nil {
 			return err
 		}
@@ -114,9 +114,4 @@ func (p *pid) UnmarshalGraphQL(input interface{}) error {
 
 func (pid) ImplementsGraphQLType(name string) bool {
 	return name == "ID"
-}
-
-func newPID() pid {
-	uuid, _ := uuid.NewV4()
-	return pid(uuid)
 }

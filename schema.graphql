@@ -16,8 +16,6 @@ enum ProcessState {
   FAILED
 }
 
-scalar ID
-
 type Process {
   pid: ID!
   status: ProcessState!
