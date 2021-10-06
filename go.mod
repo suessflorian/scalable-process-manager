@@ -3,6 +3,7 @@ module subscription
 go 1.16
 
 require (
+	github.com/99designs/gqlgen v0.14.0
 	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/graph-gophers/graphql-go v1.2.0
 	github.com/sirupsen/logrus v1.8.1

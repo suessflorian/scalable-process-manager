@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gofrs/uuid"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
@@ -40,6 +41,7 @@ func (r *resolver) AllProcesses() []Process {
 var schema string
 
 func main() {
+	http.Handle("/", playground.Handler("Playground", "/query"))
 	http.Handle("/query", &relay.Handler{
 		Schema: graphql.MustParseSchema(
 			schema,
