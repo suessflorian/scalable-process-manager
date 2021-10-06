@@ -90,16 +90,22 @@ func (s *store) NewProcess() (*Process, error) {
 
 	return &process, nil
 }
+
 func (s *store) Processes() ([]Process, error) {
-	_, err := s.db.Query("SELECT id, status FROM processes")
+	rows, err := s.db.Query("SELECT id, status FROM processes")
 	if err != nil {
 		return nil, fmt.Errorf("failed to select from processes: %w", err)
 	}
+	defer rows.Close()
 
 	var processes []Process
-//	if err := sqlscan.ScanAll(&processes, rows); err != nil {
-//		return nil, fmt.Errorf("failed to scan result set: %w", err)
-//	}
+	for rows.Next() {
+		var process Process
+		if err := rows.Scan(&process.Pid, &process.Status); err != nil {
+			return nil, fmt.Errorf("failed to scan process: %w", err)
+		}
+		processes = append(processes, process)
+	}
 
 	return processes, nil
 }
