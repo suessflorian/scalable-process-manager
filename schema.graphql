@@ -1,0 +1,24 @@
+type Query {
+  allProcesses: [Process!]!
+}
+
+type Mutation {
+  newProcess: Process
+}
+
+# type Subscription {
+#   subscribeToProcess(pid: ID): Process
+# }
+
+enum ProcessState {
+  RUNNING
+  FINISHED
+  FAILED
+}
+
+scalar ID
+
+type Process {
+  pid: ID!
+  status: ProcessState!
+}
