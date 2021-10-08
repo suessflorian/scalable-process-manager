@@ -30,11 +30,9 @@ type Process struct {
 }
 type resolver struct{ *store }
 
-func (r *resolver) NewProcess() (*Process, error) { return r.store.NewProcess() }
-
-func (r *resolver) AllProcesses() ([]Process, error) {
-	return r.store.Processes()
-}
+func (r *resolver) Process() *resolver      { return r }
+func (r *resolver) All() ([]Process, error) { return r.store.List() }
+func (r *resolver) New() (Process, error)   { return r.store.New() }
 
 //go:embed schema.graphql
 var schema string
@@ -82,29 +80,14 @@ func mustNewStore() *store {
 }
 
 func (s *store) Close() error { return s.db.Close() }
-func (s *store) NewProcess() (*Process, error) {
+func (s *store) New() (Process, error) {
 	var process Process
-	err := sqlscan.Get(context.TODO(), s.db, &process, "INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
-	return &process, err
+	return process, sqlscan.Get(context.TODO(), s.db, &process, "INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
 }
 
-func (s *store) Processes() ([]Process, error) {
-	rows, err := s.db.Query("SELECT id, status FROM processes")
-	if err != nil {
-		return nil, fmt.Errorf("failed to select from processes: %w", err)
-	}
-	defer rows.Close()
-
+func (s *store) List() ([]Process, error) {
 	var processes []Process
-	for rows.Next() {
-		var process Process
-		if err := rows.Scan(&process.Id, &process.Status); err != nil {
-			return nil, fmt.Errorf("failed to scan process: %w", err)
-		}
-		processes = append(processes, process)
-	}
-
-	return processes, nil
+	return processes, sqlscan.Select(context.TODO(), s.db, &processes, "SELECT id, status FROM processes")
 }
 
 type pid int

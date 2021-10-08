@@ -1,9 +1,17 @@
 type Query {
-  allProcesses: [Process!]!
+  process: ProcessQuery
+}
+
+type ProcessQuery {
+  all: [Process!]!
 }
 
 type Mutation {
-  newProcess: Process
+  process: ProcessMutation
+}
+
+type ProcessMutation {
+  new: Process!
 }
 
 # type Subscription {
