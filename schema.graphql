@@ -12,6 +12,7 @@ type Mutation {
 
 type ProcessMutation {
   new: Process!
+  stop(pid: ID!): Process!
 }
 
 # type Subscription {
@@ -20,6 +21,7 @@ type ProcessMutation {
 
 enum ProcessState {
   RUNNING
+  CANCELED
   FINISHED
   FAILED
 }
