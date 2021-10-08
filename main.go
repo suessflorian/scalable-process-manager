@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/99designs/gqlgen/graphql/playground"
+	"github.com/georgysavva/scany/sqlscan"
 	"github.com/graph-gophers/graphql-go"
 	"github.com/graph-gophers/graphql-go/relay"
 	log "github.com/sirupsen/logrus"
@@ -23,7 +25,7 @@ const (
 )
 
 type Process struct {
-	Pid    pid
+	Id     pid
 	Status ProcessState
 }
 type resolver struct{ *store }
@@ -81,14 +83,9 @@ func mustNewStore() *store {
 
 func (s *store) Close() error { return s.db.Close() }
 func (s *store) NewProcess() (*Process, error) {
-	row := s.db.QueryRow("INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
-
 	var process Process
-	if err := row.Scan(&process.Pid, &process.Status); err != nil {
-		return nil, fmt.Errorf("failed to insert into processes table: %w", err)
-	}
-
-	return &process, nil
+	err := sqlscan.Get(context.TODO(), s.db, &process, "INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
+	return &process, err
 }
 
 func (s *store) Processes() ([]Process, error) {
@@ -101,7 +98,7 @@ func (s *store) Processes() ([]Process, error) {
 	var processes []Process
 	for rows.Next() {
 		var process Process
-		if err := rows.Scan(&process.Pid, &process.Status); err != nil {
+		if err := rows.Scan(&process.Id, &process.Status); err != nil {
 			return nil, fmt.Errorf("failed to scan process: %w", err)
 		}
 		processes = append(processes, process)

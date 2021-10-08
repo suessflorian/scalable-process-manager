@@ -17,6 +17,6 @@ enum ProcessState {
 }
 
 type Process {
-  pid: ID!
+  id: ID!
   status: ProcessState!
 }
