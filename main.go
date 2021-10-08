@@ -30,9 +30,9 @@ type Process struct {
 }
 type resolver struct{ *store }
 
-func (r *resolver) Process() *resolver      { return r }
-func (r *resolver) All() ([]Process, error) { return r.store.List() }
-func (r *resolver) New() (Process, error)   { return r.store.New() }
+func (r *resolver) Process() *resolver                         { return r }
+func (r *resolver) All(ctx context.Context) ([]Process, error) { return r.store.List(ctx) }
+func (r *resolver) New(ctx context.Context) (Process, error)   { return r.store.New(ctx) }
 
 //go:embed schema.graphql
 var schema string
@@ -80,14 +80,14 @@ func mustNewStore() *store {
 }
 
 func (s *store) Close() error { return s.db.Close() }
-func (s *store) New() (Process, error) {
+func (s *store) New(ctx context.Context) (Process, error) {
 	var process Process
-	return process, sqlscan.Get(context.TODO(), s.db, &process, "INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
+	return process, sqlscan.Get(ctx, s.db, &process, "INSERT INTO processes(status) VALUES($1) RETURNING *", RUNNING)
 }
 
-func (s *store) List() ([]Process, error) {
+func (s *store) List(ctx context.Context) ([]Process, error) {
 	var processes []Process
-	return processes, sqlscan.Select(context.TODO(), s.db, &processes, "SELECT id, status FROM processes")
+	return processes, sqlscan.Select(ctx, s.db, &processes, "SELECT id, status FROM processes")
 }
 
 type pid int
