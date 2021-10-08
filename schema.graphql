@@ -15,15 +15,11 @@ type ProcessMutation {
   stop(pid: ID!): Process!
 }
 
-# type Subscription {
-#   subscribeToProcess(pid: ID): Process
-# }
-
 enum ProcessState {
   RUNNING
+  CANCELING
   CANCELED
   FINISHED
-  FAILED
 }
 
 type Process {

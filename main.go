@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -22,9 +21,10 @@ import (
 type ProcessState string
 
 const (
-	RUNNING  ProcessState = "RUNNING"
-	FINISHED ProcessState = "FINISHED"
-	CANCELED ProcessState = "CANCELED"
+	RUNNING   ProcessState = "RUNNING"
+	CANCELING ProcessState = "CANCELING"
+	FINISHED  ProcessState = "FINISHED"
+	CANCELED  ProcessState = "CANCELED"
 )
 
 type Process struct {
@@ -53,7 +53,7 @@ func main() {
 	http.Handle("/query", &relay.Handler{
 		Schema: graphql.MustParseSchema(
 			schema,
-			&resolver{&manager{store, make(map[pid]context.CancelFunc)}},
+			&resolver{&manager{store}},
 			graphql.UseFieldResolvers(),
 		)})
 
@@ -95,6 +95,10 @@ func (s *store) Update(ctx context.Context, update Process) (process Process, er
 	return process, s.db.QueryRowContext(ctx, "UPDATE processes SET status=$1 WHERE id=$2 RETURNING id, status", update.Status, update.Id).Scan(&process.Id, &process.Status)
 }
 
+func (s *store) Get(ctx context.Context, pid pid) (process Process, err error) {
+	return process, s.db.QueryRowContext(ctx, "SELECT id, status FROM processes WHERE id=$1", pid).Scan(&process.Id, &process.Status)
+}
+
 func (s *store) List(ctx context.Context) ([]Process, error) {
 	rows, err := s.db.QueryContext(ctx, "SELECT id, status FROM processes")
 	if err != nil {
@@ -115,7 +119,6 @@ func (s *store) List(ctx context.Context) ([]Process, error) {
 
 type manager struct {
 	*store
-	managing map[pid]context.CancelFunc
 }
 
 func (m *manager) Spawn(ctx context.Context) (p Process, err error) {
@@ -124,30 +127,48 @@ func (m *manager) Spawn(ctx context.Context) (p Process, err error) {
 		return
 	}
 
-	ctx, m.managing[p.Id] = context.WithCancel(context.Background())
+	go func(pid pid) {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	go func(ctx context.Context) {
-		time.Sleep(time.Second * 5)
-		_, err := m.Update(ctx, Process{Id: p.Id, Status: FINISHED})
-		if err != nil && err != context.Canceled {
-			log.WithError(err).Fatal("couldn't update process state")
+		go func(ctx context.Context, finished context.CancelFunc) {
+			time.Sleep(time.Second * 5)
+			_, err := m.Update(ctx, Process{Id: p.Id, Status: FINISHED})
+			if err != nil && err != context.Canceled {
+				log.WithError(err).Fatal("couldn't update process state")
+			}
+			finished()
+		}(ctx, cancel)
+
+		t := time.NewTicker(2 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				process, err := m.store.Get(ctx, pid)
+				if err == context.Canceled {
+					return
+				} else if err != nil {
+					log.WithError(err).Fatal("couldn't poll for process status")
+				}
+
+				if process.Status == CANCELING {
+					cancel()
+					if _, err := m.Update(context.Background(), Process{Id: p.Id, Status: CANCELED}); err != nil {
+						log.WithError(err).Fatal("couldn't update cancelling process to cancelled")
+					}
+					return
+				}
+			}
 		}
-	}(ctx)
+	}(p.Id)
 
 	return p, nil
 }
 
 func (m *manager) Interupt(ctx context.Context, pid pid) (process Process, err error) {
-	if cancel, ok := m.managing[pid]; !ok {
-		return process, errors.New("process not managed by this instance")
-	} else {
-		cancel()
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Second*2)
-	defer cancel()
-
-	return m.Update(ctx, Process{Id: pid, Status: CANCELED})
+	return m.Update(ctx, Process{Id: pid, Status: CANCELING})
 }
 
 type pid int
