@@ -9,5 +9,5 @@ The problem here is the introduction of service state.
 # Solution
 
 ```sh
-go run .
+docker compose up --scale process-manager=12
 ```
