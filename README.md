@@ -7,7 +7,7 @@ The naive solution typically includes some utilisation of [`context.WithCancel`]
 The problem here is that this `CancelFunc` map centralises process state, prohibiting horizontal scaling of the service as each service would own the means of cancelling different process. I personally ran into this problem. So this serves as a playground to explore alternative methods.
 
 # Current Solution
-Basically pushing the responsibility of tracking process state to the database. For each process, a goroutine is spawned, which concurrently polls for process cancel requests and runs the process.
+Basically pushing the responsibility of tracking process state to the database. For each process, a goroutine is spawned, which concurrently polls for process cancel requests and runs the process. Use of [`nginx` for some simple load balancing](http://nginx.org/en/docs/http/load_balancing.html).
 
 ```sh
 docker compose up --scale process-manager=12
